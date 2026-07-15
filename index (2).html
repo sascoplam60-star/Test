@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shelf Life — Stock Expiry Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12161B;
+    --panel:#1B2129;
+    --panel-2:#20272F;
+    --border:#2A323C;
+    --text:#EDEFF2;
+    --text-dim:#8A94A3;
+    --ok:#3FB68C;
+    --ok-dim:#1E3A31;
+    --warn:#E8A33D;
+    --warn-dim:#3D2E14;
+    --expired:#E15252;
+    --expired-dim:#3A1B1B;
+    --action:#4C7A92;
+    --action-hover:#5C90AB;
+    --font-display:'Oswald', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+    --font-body:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    padding:24px 16px 60px;
+    min-height:100vh;
+  }
+  .app{max-width:1100px;margin:0 auto;}
+
+  /* HEADER */
+  header{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:16px;
+    border-bottom:2px solid var(--border);
+    padding-bottom:18px;
+    margin-bottom:20px;
+  }
+  .brand-eyebrow{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--warn);
+    text-transform:uppercase;
+    margin:0 0 4px;
+  }
+  h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:32px;
+    letter-spacing:0.5px;
+    margin:0;
+    text-transform:uppercase;
+  }
+  .sync-status{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .sync-dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--ok);
+    box-shadow:0 0 0 0 rgba(63,182,138,0.6);
+    animation:pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot{
+    0%{box-shadow:0 0 0 0 rgba(63,182,138,0.5);}
+    70%{box-shadow:0 0 0 6px rgba(63,182,138,0);}
+    100%{box-shadow:0 0 0 0 rgba(63,182,138,0);}
+  }
+
+  .role-bar{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    background:var(--panel);
+    border:1px solid var(--border);
+    padding:10px 14px;
+    border-radius:6px;
+    margin-bottom:20px;
+  }
+  .role-bar label{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  select, input[type=text], input[type=number], input[type=date]{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:4px;
+    font-family:var(--font-body);
+    font-size:14px;
+  }
+  select:focus, input:focus{outline:2px solid var(--action);outline-offset:1px;}
+
+  /* ALERT BANNER */
+  .alerts{
+    display:none;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:20px;
+  }
+  .alerts.show{display:flex;}
+  .alert-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 14px;
+    border-radius:6px;
+    font-size:14px;
+    font-family:var(--font-body);
+  }
+  .alert-row.expired-alert{background:var(--expired-dim);border:1px solid var(--expired);color:#FFC9C9;}
+  .alert-row.warn-alert{background:var(--warn-dim);border:1px solid var(--warn);color:#FFD79A;}
+  .alert-row strong{font-family:var(--font-mono);}
+  .alert-icon{font-size:16px;flex-shrink:0;}
+
+  /* ADD PANEL */
+  .add-panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:18px;
+    margin-bottom:26px;
+  }
+  .add-panel h2{
+    font-family:var(--font-display);
+    font-size:15px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin:0 0 14px;
+    color:var(--text-dim);
+  }
+  .add-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr 1.4fr 1.2fr auto;
+    gap:10px;
+    align-items:end;
+  }
+  @media(max-width:760px){.add-grid{grid-template-columns:1fr 1fr;}}
+  .field label{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:10px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin-bottom:5px;
+  }
+  .field input{width:100%;}
+  .btn{
+    border:none;
+    border-radius:4px;
+    padding:10px 16px;
+    font-family:var(--font-mono);
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:0.5px;
+    cursor:pointer;
+    text-transform:uppercase;
+    transition:background 0.15s;
+  }
+  .btn-add{background:var(--action);color:#fff;}
+  .btn-add:hover{background:var(--action-hover);}
+  .btn-add:disabled{background:#3A424B;color:var(--text-dim);cursor:not-allowed;}
+  .locked-note{
+    font-size:13px;
+    color:var(--text-dim);
+    font-style:italic;
+  }
+
+  /* STATS */
+  .stats{
+    display:flex;
+    gap:12px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+  }
+  .stat-chip{
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+  }
+  .stat-chip b{color:var(--text);font-size:14px;}
+  .stat-chip.expired b{color:var(--expired);}
+  .stat-chip.warn b{color:var(--warn);}
+  .stat-chip.ok b{color:var(--ok);}
+
+  .toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:14px;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .toolbar input{flex:1;min-width:180px;}
+
+  /* GRID OF TICKETS */
+  .items-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+    gap:16px;
+  }
+  .empty-state{
+    grid-column:1/-1;
+    text-align:center;
+    padding:50px 20px;
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:13px;
+    border:1px dashed var(--border);
+    border-radius:8px;
+  }
+
+  .tag{
+    position:relative;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:16px 14px 14px 18px;
+    overflow:hidden;
+  }
+  .tag::before{
+    content:'';
+    position:absolute;
+    left:0;top:0;bottom:0;
+    width:6px;
+  }
+  .tag.status-ok::before{background:var(--ok);}
+  .tag.status-warn::before{background:var(--warn);}
+  .tag.status-expired::before{background:var(--expired);}
+
+  .tag::after{
+    content:'';
+    position:absolute;
+    left:-1px;top:50%;
+    width:14px;height:14px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:50%;
+    transform:translate(-50%,-50%);
+  }
+
+  .tag-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .tag-name{
+    font-family:var(--font-display);
+    font-size:18px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+    line-height:1.2;
+  }
+  .status-pill{
+    font-family:var(--font-mono);
+    font-size:10px;
+    padding:3px 8px;
+    border-radius:10px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .status-pill.status-ok{background:var(--ok-dim);color:var(--ok);}
+  .status-pill.status-warn{background:var(--warn-dim);color:var(--warn);}
+  .status-pill.status-expired{background:var(--expired-dim);color:var(--expired);}
+
+  .tag-row{
+    display:flex;
+    justify-content:space-between;
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    color:var(--text-dim);
+    padding:4px 0;
+    border-bottom:1px dashed var(--border);
+  }
+  .tag-row span:last-child{color:var(--text);}
+  .tag-row:last-of-type{border-bottom:none;}
+
+  .barcode-strip{
+    margin-top:10px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .barcode-bars{
+    display:flex;
+    gap:1.5px;
+    height:22px;
+    align-items:flex-end;
+  }
+  .barcode-bars span{
+    background:var(--text-dim);
+    width:2px;
+  }
+  .barcode-num{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-dim);
+  }
+
+  .tag-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:12px;
+  }
+  .days-left{
+    font-family:var(--font-mono);
+    font-size:12px;
+  }
+  .days-left.status-ok{color:var(--ok);}
+  .days-left.status-warn{color:var(--warn);}
+  .days-left.status-expired{color:var(--expired);}
+
+  .btn-delete{
+    background:transparent;
+    border:1px solid var(--expired);
+    color:var(--expired);
+    padding:5px 10px;
+    font-size:11px;
+    border-radius:4px;
+  }
+  .btn-delete:hover{background:var(--expired);color:#fff;}
+
+  .toast{
+    position:fixed;
+    bottom:20px;left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    padding:10px 18px;
+    border-radius:6px;
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    opacity:0;
+    transition:all 0.25s ease;
+    pointer-events:none;
+    z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <p class="brand-eyebrow">Stock Room / Live Sync</p>
+      <h1>Shelf Life</h1>
+    </div>
+    <div class="sync-status"><span class="sync-dot"></span><span id="syncText">syncing…</span></div>
+  </header>
+
+  <div class="role-bar">
+    <label for="roleSelect">Signed in as</label>
+    <select id="roleSelect">
+      <option value="staff">Staff (add items)</option>
+      <option value="admin">Admin (delete only)</option>
+    </select>
+    <label for="nameInput">Name</label>
+    <input type="text" id="nameInput" placeholder="e.g. Sarah" style="width:130px;">
+  </div>
+
+  <div class="alerts" id="alertBar"></div>
+
+  <div class="add-panel">
+    <h2 id="addPanelTitle">Add New Stock Item</h2>
+    <div class="add-grid" id="addGrid">
+      <div class="field">
+        <label>Item Name</label>
+        <input type="text" id="fName" placeholder="e.g. Fresh Milk 1L">
+      </div>
+      <div class="field">
+        <label>Qty</label>
+        <input type="number" id="fQty" placeholder="0" min="0">
+      </div>
+      <div class="field">
+        <label>Barcode</label>
+        <input type="text" id="fBarcode" placeholder="e.g. 8901030876">
+      </div>
+      <div class="field">
+        <label>Expiry Date</label>
+        <input type="date" id="fExpiry">
+      </div>
+      <button class="btn btn-add" id="addBtn">+ Add Item</button>
+    </div>
+    <p class="locked-note" id="lockedNote" style="display:none;">Admin accounts can view and delete stock, but cannot add new items. Switch to Staff to add.</p>
+  </div>
+
+  <div class="stats">
+    <span class="stat-chip"><b id="statTotal">0</b> items tracked</span>
+    <span class="stat-chip expired"><b id="statExpired">0</b> expired</span>
+    <span class="stat-chip warn"><b id="statWarn">0</b> expiring ≤10 days</span>
+    <span class="stat-chip ok"><b id="statOk">0</b> fresh</span>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="searchBox" placeholder="Search by item name or barcode…">
+  </div>
+
+  <div class="items-grid" id="itemsGrid"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getDatabase, ref, set, onValue
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAGWfabt5kOGA9G8B6S5KJf_Z_CrbdukCE",
+  authDomain: "test-a764b.firebaseapp.com",
+  databaseURL: "https://test-a764b-default-rtdb.firebaseio.com",
+  projectId: "test-a764b",
+  storageBucket: "test-a764b.firebasestorage.app",
+  messagingSenderId: "652669473388",
+  appId: "1:652669473388:web:c649c9eae748858d48fe49",
+  measurementId: "G-XKLV698BNT"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+const itemsRef = ref(db, "shelfLife/items");
+
+const WARN_DAYS = 10;
+
+let items = [];
+let searchTerm = '';
+
+const roleSelect = document.getElementById('roleSelect');
+const nameInput = document.getElementById('nameInput');
+const addBtn = document.getElementById('addBtn');
+const lockedNote = document.getElementById('lockedNote');
+const addGrid = document.getElementById('addGrid');
+const syncText = document.getElementById('syncText');
+const toastEl = document.getElementById('toast');
+
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=> toastEl.classList.remove('show'), 2200);
+}
+
+function uid(){
+  return 'itm_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+
+function daysUntil(dateStr){
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const target = new Date(dateStr + 'T00:00:00');
+  return Math.round((target - today) / 86400000);
+}
+
+function statusOf(dateStr){
+  const d = daysUntil(dateStr);
+  if(d < 0) return 'expired';
+  if(d <= WARN_DAYS) return 'warn';
+  return 'ok';
+}
+
+function statusLabel(status, days){
+  if(status === 'expired') return `Expired ${Math.abs(days)}d ago`;
+  if(status === 'warn') return days === 0 ? 'Expires today' : `${days}d left`;
+  return `${days}d left`;
+}
+
+function barcodeBarsHTML(code){
+  let bars = '';
+  const chars = (code || '000000').split('');
+  chars.slice(0, 20).forEach((ch, i) => {
+    const h = 10 + (ch.charCodeAt(0) % 12);
+    bars += `<span style="height:${h}px;"></span>`;
+  });
+  return bars;
+}
+
+function escapeHTML(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function subscribeToItems(){
+  syncText.textContent = 'syncing…';
+  onValue(itemsRef,
+    (snap) => {
+      const data = snap.val();
+      items = Array.isArray(data) ? data : [];
+      syncText.textContent = 'live · updated ' + new Date().toLocaleTimeString();
+      render();
+    },
+    (err) => {
+      console.error(err);
+      syncText.textContent = 'offline — retrying…';
+    }
+  );
+}
+
+async function saveItems(){
+  try{
+    await set(itemsRef, items);
+    syncText.textContent = 'live · updated ' + new Date().toLocaleTimeString();
+  }catch(e){
+    console.error(e);
+    showToast('Could not sync — check connection');
+  }
+}
+
+function applyRoleUI(){
+  const role = roleSelect.value;
+  if(role === 'admin'){
+    addBtn.disabled = true;
+    addGrid.querySelectorAll('input').forEach(i => i.disabled = true);
+    lockedNote.style.display = 'block';
+  } else {
+    addBtn.disabled = false;
+    addGrid.querySelectorAll('input').forEach(i => i.disabled = false);
+    lockedNote.style.display = 'none';
+  }
+  render();
+}
+
+async function addItem(){
+  const name = document.getElementById('fName').value.trim();
+  const qty = document.getElementById('fQty').value;
+  const barcode = document.getElementById('fBarcode').value.trim();
+  const expiry = document.getElementById('fExpiry').value;
+
+  if(!name || !qty || !barcode || !expiry){
+    showToast('Fill in all fields before adding');
+    return;
+  }
+
+  const who = nameInput.value.trim() || (roleSelect.value === 'admin' ? 'Admin' : 'Staff');
+
+  const newItem = {
+    id: uid(),
+    name, qty: Number(qty), barcode, expiry,
+    addedBy: who,
+    addedAt: Date.now()
+  };
+
+  items.push(newItem);
+  await saveItems();
+  render();
+  showToast(`Added "${name}"`);
+
+  document.getElementById('fName').value = '';
+  document.getElementById('fQty').value = '';
+  document.getElementById('fBarcode').value = '';
+  document.getElementById('fExpiry').value = '';
+  document.getElementById('fName').focus();
+}
+
+async function deleteItem(id){
+  if(roleSelect.value !== 'admin') return;
+  const item = items.find(i => i.id === id);
+  if(!confirm(`Delete "${item ? item.name : 'this item'}" permanently?`)) return;
+  items = items.filter(i => i.id !== id);
+  await saveItems();
+  render();
+  showToast('Item deleted');
+}
+
+function renderAlerts(){
+  const bar = document.getElementById('alertBar');
+  const expired = items.filter(i => statusOf(i.expiry) === 'expired');
+  const warn = items.filter(i => statusOf(i.expiry) === 'warn');
+
+  let html = '';
+  if(expired.length){
+    html += `<div class="alert-row expired-alert"><span class="alert-icon">⛔</span>
+      <span><strong>${expired.length} item${expired.length>1?'s':''}</strong> already expired — ${escapeHTML(expired.map(i=>i.name).slice(0,4).join(', '))}${expired.length>4?'…':''}. Please pull from shelf.</span></div>`;
+  }
+  if(warn.length){
+    html += `<div class="alert-row warn-alert"><span class="alert-icon">⚠️</span>
+      <span><strong>${warn.length} item${warn.length>1?'s':''}</strong> expiring within ${WARN_DAYS} days — ${escapeHTML(warn.map(i=>i.name).slice(0,4).join(', '))}${warn.length>4?'…':''}.</span></div>`;
+  }
+  bar.innerHTML = html;
+  bar.classList.toggle('show', html.length > 0);
+}
+
+function renderStats(){
+  document.getElementById('statTotal').textContent = items.length;
+  document.getElementById('statExpired').textContent = items.filter(i => statusOf(i.expiry) === 'expired').length;
+  document.getElementById('statWarn').textContent = items.filter(i => statusOf(i.expiry) === 'warn').length;
+  document.getElementById('statOk').textContent = items.filter(i => statusOf(i.expiry) === 'ok').length;
+}
+
+function render(){
+  renderAlerts();
+  renderStats();
+
+  const grid = document.getElementById('itemsGrid');
+  const isAdmin = roleSelect.value === 'admin';
+
+  const term = searchTerm.toLowerCase();
+  let visible = items.filter(i =>
+    !term || i.name.toLowerCase().includes(term) || i.barcode.toLowerCase().includes(term)
+  );
+
+  const order = { expired: 0, warn: 1, ok: 2 };
+  visible.sort((a,b) => {
+    const sa = statusOf(a.expiry), sb = statusOf(b.expiry);
+    if(order[sa] !== order[sb]) return order[sa] - order[sb];
+    return new Date(a.expiry) - new Date(b.expiry);
+  });
+
+  if(visible.length === 0){
+    grid.innerHTML = `<div class="empty-state">${items.length === 0 ? 'No stock logged yet. Add your first item above.' : 'No items match your search.'}</div>`;
+    return;
+  }
+
+  grid.innerHTML = visible.map(item => {
+    const status = statusOf(item.expiry);
+    const days = daysUntil(item.expiry);
+    return `
+      <div class="tag status-${status}">
+        <div class="tag-top">
+          <div class="tag-name">${escapeHTML(item.name)}</div>
+          <span class="status-pill status-${status}">${status === 'ok' ? 'Fresh' : status === 'warn' ? 'Warning' : 'Expired'}</span>
+        </div>
+        <div class="tag-row"><span>Qty</span><span>${item.qty}</span></div>
+        <div class="tag-row"><span>Expires</span><span>${item.expiry}</span></div>
+        <div class="tag-row"><span>Added by</span><span>${escapeHTML(item.addedBy || '—')}</span></div>
+        <div class="barcode-strip">
+          <div class="barcode-bars">${barcodeBarsHTML(item.barcode)}</div>
+          <span class="barcode-num">${escapeHTML(item.barcode)}</span>
+        </div>
+        <div class="tag-footer">
+          <span class="days-left status-${status}">${statusLabel(status, days)}</span>
+          ${isAdmin ? `<button class="btn-delete" onclick="deleteItem('${item.id}')">Delete</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+roleSelect.addEventListener('change', applyRoleUI);
+addBtn.addEventListener('click', addItem);
+document.getElementById('searchBox').addEventListener('input', (e) => {
+  searchTerm = e.target.value;
+  render();
+});
+
+// initial subscribe for realtime sync across users/devices
+subscribeToItems();
+applyRoleUI();
+</script>
+</body>
+</html>
